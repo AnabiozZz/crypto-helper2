@@ -1,0 +1,24 @@
+{
+    "stage_check": [
+        {"gap_tolerance_n": 0},
+        {"min_value": 0},
+        {"max_value": 1000000}
+    ],
+    "stage_prepare": [
+        {"aggregate_n": 60},
+        {"slice_start": "2025-10-27T09:52:00"},
+        {"slice_end": "2025-10-28T09:52:00"}
+    ],
+    "stage_peaks_detect": [
+        {"point": "close"},
+        {"threshold": 0.3}
+    ],
+    "indicators": [
+        {"type": "trendlines_auto", "point": "close"},
+        {"type": "h_vol", "step": 1000}
+    ],
+    "stage_regression": [
+        {"threshold": 0.7},
+        {"learn_test_ratio": 5}
+    ]
+}
