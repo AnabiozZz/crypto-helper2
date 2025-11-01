@@ -1,6 +1,7 @@
 import argparse
 import json
 import pandas as pd
+import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', help='path to ohlcv csv table', type=str, default="btcusd_1-min_data.csv")
@@ -63,6 +64,34 @@ if (len(gaps)):
         print('exit')
         exit(1)
 ## stage peaks detect
-prepare_conf = config["stage_peaks_detect"]
+peaks_conf = config["stage_peaks_detect"]
+point_column = peaks_conf['point_column']
+diff_threshold = peaks_conf['diff_threshold']
+peak_last = candles_sliced.iloc[0]
+peak_new = candles_sliced.iloc[0]
+peak_new_idx = np.nan
+diff_left_max = 0
+diff_new = 0
+for index, row in candles_sliced.iterrows():
+    diff_left = (row[point_column] - peak_last[point_column])/peak_last[point_column]
+    if (abs(diff_left) > abs(diff_left_max)):
+        peak_new_idx = index
+        peak_new = row
+        diff_left_max = diff_left
+    if (abs(diff_left_max) >= diff_threshold):
+        diff_right = (row[point_column] - peak_new[point_column])/peak_new[point_column]
+        if (abs(diff_right) >= diff_threshold):
+            candles_sliced.loc[peak_new_idx, 'diff'] = diff_left_max
+            peak_last = peak_new
+            peak_new_idx = index
+            peak_new = row
+            diff_left = diff_right
+            diff_left_max = diff_left
+            diff_right = 0
+            
+print(candles_sliced.dropna())
 
+        
 
+    
+        
