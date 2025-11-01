@@ -17,7 +17,9 @@
     },
     "indicators": [
         {"type": "trendlines_auto", "point": "close"},
-        {"type": "h_vol", "step": 1000}
+        {"type": "h_vol", "step": 1000},
+        {"type": "sma", "point": "close", "n": []},
+        {"type": "rsi", "step": 1000}
     ],
     "stage_regression": {
         "threshold": 0.7,

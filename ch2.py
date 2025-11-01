@@ -2,6 +2,9 @@ import argparse
 import json
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+from ch_indicators import *
+#plt.style.use('seaborn-whitegrid')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', help='path to ohlcv csv table', type=str, default="btcusd_1-min_data.csv")
@@ -88,9 +91,24 @@ for index, row in candles_sliced.iterrows():
             diff_left = diff_right
             diff_left_max = diff_left
             diff_right = 0
-            
-print(candles_sliced.dropna())
-
+diff_view = candles_sliced.dropna()           
+print(diff_view)
+fig = plt.figure()
+ax_diff = plt.axes()
+ax_diff.set_label('diff')
+ax_diff.plot(diff_view.index, diff_view['diff'], color='blue');
+ax_price = ax_diff.twinx()
+ax_diff.set_label(point_column)
+ax_price.plot(diff_view.index, diff_view[point_column], color='red');
+ax_diff.legend()
+plt.show()
+## calculate indicators
+indicators_conf = config["indicators"]
+for i in indicators_conf:
+    try:
+        candles_sliced = indicators_f[i['type']](candles_sliced, i, candles)
+    except Exception as e:
+        print(f"An error occurred: {type(e).__name__} {e}")
         
 
     
