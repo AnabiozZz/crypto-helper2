@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from ch_indicators import *
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import KFold, cross_val_score
 #plt.style.use('seaborn-whitegrid')
 
 parser = argparse.ArgumentParser()
@@ -72,44 +74,63 @@ point_column = peaks_conf['point_column']
 diff_threshold = peaks_conf['diff_threshold']
 peak_last = candles_sliced.iloc[0]
 peak_new = candles_sliced.iloc[0]
-peak_new_idx = np.nan
 diff_left_max = 0
-diff_new = 0
 for index, row in candles_sliced.iterrows():
     diff_left = (row[point_column] - peak_last[point_column])/peak_last[point_column]
     if (abs(diff_left) > abs(diff_left_max)):
-        peak_new_idx = index
         peak_new = row
         diff_left_max = diff_left
     if (abs(diff_left_max) >= diff_threshold):
         diff_right = (row[point_column] - peak_new[point_column])/peak_new[point_column]
         if (abs(diff_right) >= diff_threshold):
-            candles_sliced.loc[peak_new_idx, 'diff'] = diff_left_max
+            candles_sliced.loc[peak_last.name, 'diff'] = diff_left_max
             peak_last = peak_new
-            peak_new_idx = index
             peak_new = row
             diff_left = diff_right
             diff_left_max = diff_left
             diff_right = 0
+candles_sliced.iloc[0,candles_sliced.columns.get_loc('diff')] = np.nan  #отсечение первого пика т.к. для него нет левого отклонения
 diff_view = candles_sliced.dropna()           
 print(diff_view)
 fig = plt.figure()
 ax_diff = plt.axes()
 ax_diff.set_label('diff')
-ax_diff.plot(diff_view.index, diff_view['diff'], color='blue');
+ax_diff.plot(diff_view.index, diff_view['diff'], color='blue')
 ax_price = ax_diff.twinx()
 ax_diff.set_label(point_column)
-ax_price.plot(diff_view.index, diff_view[point_column], color='red');
+ax_price.plot(diff_view.index, diff_view[point_column], color='red')
 ax_diff.legend()
-plt.show()
+#plt.show()
 ## calculate indicators
 indicators_conf = config["indicators"]
 for i in indicators_conf:
     try:
-        candles_sliced = indicators_f[i['type']](candles_sliced, i, candles)
+        candles_sliced = indicators_f[i['type']](candles_sliced, i, ohlc_raw=candles)
     except Exception as e:
         print(f"An error occurred: {type(e).__name__} {e}")
-        
+##stage_regression
+regression_conf = config["stage_regression"]
+### correlation
+corr_threshold = regression_conf["threshold"]
+df_diff_ind = candles_sliced.loc[:, "diff":].dropna()
+ind_to_drop = []
+for ind in df_diff_ind.columns[:0:-1]:
+    ind_corr = df_diff_ind.loc[:,['diff',ind]].corr(method='pearson').iloc[0,1]
+    print(f'correlation for {ind}: {ind_corr}')
+    if abs(ind_corr) < corr_threshold:
+        ind_to_drop.append(ind)  
+df_diff_ind.drop(ind_to_drop, axis=1, inplace=True)
+### linear regression
+learn_test_ratio = regression_conf["learn_test_ratio"]
+kfold = KFold(n_splits=learn_test_ratio, random_state=7, shuffle=True)
+model = LinearRegression()
+if len(df_diff_ind.columns) <= 1:
+    print('NO CORRELATIONS FOUND. EXIT')
+    exit(1)
+results = cross_val_score(model, df_diff_ind.iloc[:, 1:], df_diff_ind['diff'], cv=kfold)
+print(results)
+print("MSE: mean = %.3f (stdev = %.3f)" % (results.mean(), results.std()))
+
 
     
         
