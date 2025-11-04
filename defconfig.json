@@ -8,7 +8,7 @@
     },
     "stage_prepare": {
         "resample_period": "D",
-        "slice_start": "2024-10-27T09:52:00",
+        "slice_start": "2023-10-27T09:52:00",
         "slice_end": "2025-03-15T09:52:00"
     },
     "stage_peaks_detect": {
@@ -22,7 +22,7 @@
         {"type": "rsi", "n": [7, 14, 28]}
     ],
     "stage_regression": {
-        "threshold": 0.7,
+        "threshold": 0.5,
         "learn_test_ratio": 3
     }
 }

@@ -4,8 +4,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from ch_indicators import *
-from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import KFold, cross_val_score
+from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score, train_test_split
+from sklearn.metrics import confusion_matrix
 #plt.style.use('seaborn-whitegrid')
 
 parser = argparse.ArgumentParser()
@@ -90,6 +91,9 @@ for index, row in candles_sliced.iterrows():
             diff_left_max = diff_left
             diff_right = 0
 candles_sliced.iloc[0,candles_sliced.columns.get_loc('diff')] = np.nan  #отсечение первого пика т.к. для него нет левого отклонения
+candles_sliced['peak_high'] = candles_sliced['diff'] < 0
+candles_sliced['peak_low'] = candles_sliced['diff'] > 0
+print(f'logistic high\low peak {candles_sliced}')
 diff_view = candles_sliced.dropna()           
 print(diff_view)
 fig = plt.figure()
@@ -112,7 +116,9 @@ for i in indicators_conf:
 regression_conf = config["stage_regression"]
 ### correlation
 corr_threshold = regression_conf["threshold"]
-df_diff_ind = candles_sliced.loc[:, "diff":].dropna()
+df_diff_ind = candles_sliced.loc[:, 'diff':].dropna()
+df_diff_ind.drop(['peak_high','peak_low'], axis=1, inplace=True)
+#print(df_diff_ind)
 ind_to_drop = []
 for ind in df_diff_ind.columns[:0:-1]:
     ind_corr = df_diff_ind.loc[:,['diff',ind]].corr(method='pearson').iloc[0,1]
@@ -120,17 +126,40 @@ for ind in df_diff_ind.columns[:0:-1]:
     if abs(ind_corr) < corr_threshold:
         ind_to_drop.append(ind)  
 df_diff_ind.drop(ind_to_drop, axis=1, inplace=True)
+if len(df_diff_ind.columns) <= 1:
+    print('NO CORRELATIONS FOUND. EXIT')
+    exit(1)
 ### linear regression
 learn_test_ratio = regression_conf["learn_test_ratio"]
 kfold = KFold(n_splits=learn_test_ratio, random_state=7, shuffle=True)
 model = LinearRegression()
-if len(df_diff_ind.columns) <= 1:
-    print('NO CORRELATIONS FOUND. EXIT')
-    exit(1)
 results = cross_val_score(model, df_diff_ind.iloc[:, 1:], df_diff_ind['diff'], cv=kfold)
-print(results)
-print("MSE: mean = %.3f (stdev = %.3f)" % (results.mean(), results.std()))
-
+#print(results)
+print("Linear regression MSE: mean = %.3f (stdev = %.3f)" % (results.mean(), results.std()))
+### logistic regression
+logist_ind = candles_sliced.loc[:,'peak_high':]
+logist_ind.drop(ind_to_drop, axis=1, inplace=True)
+logist_ind.dropna(inplace=True)
+#print(logist_ind)
+#### cross validation
+kfold = StratifiedKFold(n_splits=learn_test_ratio, random_state=7, shuffle=True)
+model = LogisticRegression(penalty=None)
+results = cross_val_score(model, logist_ind.iloc[:,:1:-1], logist_ind['peak_high'], cv=kfold, scoring="roc_auc")
+#print(results)
+print("Logistic regression (high peak) MSE: mean = %.3f (stdev = %.3f)" % (results.mean(), results.std()))
+model = LogisticRegression(penalty=None)
+results = cross_val_score(model, logist_ind.iloc[:,:1:-1], logist_ind['peak_low'], cv=kfold, scoring="roc_auc")
+#print(results)
+print("Logistic regression (low peak) MSE: mean = %.3f (stdev = %.3f)" % (results.mean(), results.std()))
+#### confusion matrix
+print(f"logist_ind high peaks:{len(logist_ind[logist_ind.peak_high == True])}")
+X_train, X_test, Y_train, Y_test = train_test_split(logist_ind.iloc[:,:1:-1], logist_ind['peak_high'], test_size=1/2, stratify=logist_ind['peak_high'])
+model = LogisticRegression(penalty=None)
+model.fit(X_train, Y_train)
+prediction = model.predict(X_test)
+matrix = confusion_matrix(y_true=Y_test, y_pred=prediction)
+print(f"Y_test high peaks:{len(Y_test[Y_test == True])}\nprediction high peaks:{len(prediction[prediction == True])} ")
+print(matrix)
 
     
         
