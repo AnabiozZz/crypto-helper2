@@ -151,7 +151,7 @@ model = LogisticRegression(penalty=None)
 results = cross_val_score(model, logist_ind.iloc[:,:1:-1], logist_ind['peak_low'], cv=kfold, scoring="roc_auc")
 #print(results)
 print("Logistic regression (low peak) MSE: mean = %.3f (stdev = %.3f)" % (results.mean(), results.std()))
-#### confusion matrix
+#### confusion matrix (high peak)
 print(f"logist_ind high peaks:{len(logist_ind[logist_ind.peak_high == True])}")
 X_train, X_test, Y_train, Y_test = train_test_split(logist_ind.iloc[:,:1:-1], logist_ind['peak_high'], test_size=1/2, stratify=logist_ind['peak_high'])
 model = LogisticRegression(penalty=None)
@@ -160,6 +160,25 @@ prediction = model.predict(X_test)
 matrix = confusion_matrix(y_true=Y_test, y_pred=prediction)
 print(f"Y_test high peaks:{len(Y_test[Y_test == True])}\nprediction high peaks:{len(prediction[prediction == True])} ")
 print(matrix)
+
+#### some uncommon test (high peak)
+test_to_predict = Y_test.to_frame()
+test_to_predict['prediction'] = prediction
+test_to_predict = test_to_predict[test_to_predict.prediction == True]
+print(test_to_predict)
+profit = 0
+td = pd.to_timedelta(candles_sliced['Timestamp'].iloc[0:2].diff(), unit='s').iloc[1]
+print(td)
+for pr_index, pr_row in test_to_predict.iterrows():
+    price_buy = candles_sliced.loc[pr_index,point_column]
+    for ohlc_index, ohlc_row in candles_sliced.loc[pr_index+td:].iterrows():
+        diff = (ohlc_row[point_column] - price_buy)/price_buy
+        if (abs(diff) > diff_threshold):
+            profit += -diff
+            break
+print(f'Estimated profit:{profit}')
+
+
 
     
         

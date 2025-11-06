@@ -18,11 +18,12 @@
     "indicators": [
         {"type": "trendlines_auto", "point": "close"},
         {"type": "h_vol", "step": 1000},
-        {"type": "sma", "column": "Close", "n": [5, 10, 20]},
-        {"type": "rsi", "n": [7, 14, 28]}
+        {"type": "sma", "column": "Close", "n": [5, 7, 10, 14]},
+        {"type": "ema", "column": "Close", "n": [5, 7, 10, 14]},
+        {"type": "rsi", "n": [5, 7, 10, 14]}
     ],
     "stage_regression": {
-        "threshold": 0.5,
+        "threshold": 0.60,
         "learn_test_ratio": 3
     }
 }
