@@ -129,6 +129,7 @@ df_diff_ind.drop(ind_to_drop, axis=1, inplace=True)
 if len(df_diff_ind.columns) <= 1:
     print('NO CORRELATIONS FOUND. EXIT')
     exit(1)
+
 ### linear regression
 learn_test_ratio = regression_conf["learn_test_ratio"]
 kfold = KFold(n_splits=learn_test_ratio, random_state=7, shuffle=True)
@@ -153,7 +154,8 @@ results = cross_val_score(model, logist_ind.iloc[:,:1:-1], logist_ind['peak_low'
 print("Logistic regression (low peak) MSE: mean = %.3f (stdev = %.3f)" % (results.mean(), results.std()))
 #### confusion matrix (high peak)
 print(f"logist_ind high peaks:{len(logist_ind[logist_ind.peak_high == True])}")
-X_train, X_test, Y_train, Y_test = train_test_split(logist_ind.iloc[:,:1:-1], logist_ind['peak_high'], test_size=1/2, stratify=logist_ind['peak_high'])
+X_train, X_test, Y_train, Y_test = train_test_split(logist_ind.iloc[:,:1:-1], logist_ind['peak_high'], 
+                                                    test_size=1/learn_test_ratio, stratify=logist_ind['peak_high'])
 model = LogisticRegression(penalty=None)
 model.fit(X_train, Y_train)
 prediction = model.predict(X_test)

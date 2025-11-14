@@ -8,8 +8,8 @@
     },
     "stage_prepare": {
         "resample_period": "D",
-        "slice_start": "2023-10-27T09:52:00",
-        "slice_end": "2025-03-15T09:52:00"
+        "slice_start": "2024-03-02T09:52:00",
+        "slice_end": "2024-10-03T09:52:00"
     },
     "stage_peaks_detect": {
         "point_column": "Close",
@@ -20,10 +20,11 @@
         {"type": "h_vol", "step": 1000},
         {"type": "sma", "column": "Close", "n": [5, 7, 10, 14]},
         {"type": "ema", "column": "Close", "n": [5, 7, 10, 14]},
-        {"type": "rsi", "n": [5, 7, 10, 14]}
+        {"type": "stoch", "n": [5, 7, 10, 14], "k_sma": [1], "d_sma": [3]},
+        {"type": "rsi", "n": [5, 7, 10, 14], "divergence_roi":[[0,100]]}
     ],
     "stage_regression": {
-        "threshold": 0.60,
+        "threshold": 0.7,
         "learn_test_ratio": 3
     }
 }
