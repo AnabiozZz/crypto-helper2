@@ -74,37 +74,34 @@ peaks_conf = config["stage_peaks_detect"]
 point_column = peaks_conf['point_column']
 diff_threshold = peaks_conf['diff_threshold']
 peak_last = candles_sliced.iloc[0]
-peak_new = candles_sliced.iloc[0]
+peak_new = candles_sliced.iloc[1]
 diff_left_max = 0
 for index, row in candles_sliced.iterrows():
     diff_left = (row[point_column] - peak_last[point_column])/peak_last[point_column]
-    if (abs(diff_left) > abs(diff_left_max)):
+    diff_right = (row[point_column] - peak_new[point_column])/peak_new[point_column]
+    if (abs(diff_right) < abs(diff_left)) and (abs(diff_left) > abs(diff_left_max)):
         peak_new = row
         diff_left_max = diff_left
-    if (abs(diff_left_max) >= diff_threshold):
-        diff_right = (row[point_column] - peak_new[point_column])/peak_new[point_column]
-        if (abs(diff_right) >= diff_threshold):
-            candles_sliced.loc[peak_last.name, 'diff'] = diff_left_max
-            peak_last = peak_new
-            peak_new = row
-            diff_left = diff_right
-            diff_left_max = diff_left
-            diff_right = 0
+    elif (abs(diff_left_max) >= diff_threshold) and (abs(diff_right) >= diff_threshold):
+        #print(f'!peak found: {index} = {row[point_column]}({diff_right}). apply {diff_left_max} to {peak_last.name}')
+        candles_sliced.loc[peak_last.name, 'diff'] = diff_left_max
+        peak_last = peak_new
+        peak_new = row
+        diff_left = diff_right
+        diff_left_max = diff_left
+        diff_right = 0
+
+
+candles_sliced.to_csv('candles_sliced1.csv', index=True) 
 candles_sliced.iloc[0,candles_sliced.columns.get_loc('diff')] = np.nan  #отсечение первого пика т.к. для него нет левого отклонения
 candles_sliced['peak_high'] = candles_sliced['diff'] < 0
 candles_sliced['peak_low'] = candles_sliced['diff'] > 0
-print(f'logistic high\low peak {candles_sliced}')
-diff_view = candles_sliced.dropna()           
-print(diff_view)
-fig = plt.figure()
-ax_diff = plt.axes()
-ax_diff.set_label('diff')
-ax_diff.plot(diff_view.index, diff_view['diff'], color='blue')
-ax_price = ax_diff.twinx()
-ax_diff.set_label(point_column)
-ax_price.plot(diff_view.index, diff_view[point_column], color='red')
-ax_diff.legend()
-#plt.show()
+### verify peaks
+h_peaks_cnt = len(candles_sliced[candles_sliced.peak_high == True])
+l_peaks_cnt = len(candles_sliced[candles_sliced.peak_low == True])
+if (abs(h_peaks_cnt - l_peaks_cnt) > 1):
+    print(f'FATAL ERROR: Peaks not balanced: {h_peaks_cnt}, {l_peaks_cnt}')
+    exit(1)
 ## calculate indicators
 indicators_conf = config["indicators"]
 for i in indicators_conf:
