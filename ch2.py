@@ -2,7 +2,10 @@ import argparse
 import json
 import pandas as pd
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import mplcursors
+import seaborn as sns
 from ch_indicators import *
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score, train_test_split
@@ -109,6 +112,52 @@ for i in indicators_conf:
         candles_sliced = indicators_f[i['type']](candles_sliced, i, ohlc_raw=candles)
     except Exception as e:
         print(f"An error occurred: {type(e).__name__} {e}")
+## Show plots
+plt.style.use('seaborn-v0_8-whitegrid')
+candles_sliced.to_csv('candles_sliced.csv', index=True) 
+diff_view = candles_sliced.dropna()
+diff_view.to_csv('diff_view.csv', index=True) 
+peaks_view = diff_view.loc[:,"peak_high":]
+ind_view_h = peaks_view.drop(['peak_high', 'peak_low'], axis=1)[peaks_view.peak_high == True]
+ind_view_l = peaks_view.drop(['peak_high', 'peak_low'], axis=1)[peaks_view.peak_low == True]
+fig = plt.figure(figsize=(25,13))
+x_loc_fmt = mpl.dates.DateFormatter('%d.%m.%y')
+n_rows = len(peaks_view.columns) + 1
+n_cols = 2
+plt_idx = 1
+ax = fig.add_subplot(n_rows, n_cols, plt_idx)
+ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+ax.xaxis.set_major_formatter(x_loc_fmt)
+ax.yaxis.set_major_locator(plt.MaxNLocator(8))
+plt_idx += 1
+ax.plot(diff_view.index, diff_view[point_column], color='red')
+ax.text(0.5, 0.5, 'Price', fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
+ax = fig.add_subplot(n_rows, n_cols, plt_idx)
+ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+ax.xaxis.set_major_formatter(x_loc_fmt)
+ax.yaxis.set_major_locator(plt.MaxNLocator(8))
+plt_idx += 1
+ax.plot(diff_view.index, diff_view['diff'], 'o', color='red')
+ax.text(0.5, 0.5, 'Difference', fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
+for col in ind_view_h.columns:
+    ax = fig.add_subplot(n_rows, n_cols, plt_idx)
+    ax.xaxis.set_major_locator(plt.MaxNLocator(10))
+    ax.xaxis.set_major_formatter(x_loc_fmt)
+    ax.yaxis.set_major_locator(plt.MaxNLocator(8))
+    plt_idx += 1
+    ax.text(0.5, 0.5, col, fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
+    ax.plot(ind_view_h.index, ind_view_h[col], 'v', color='red')
+    ax.plot(ind_view_l.index, ind_view_l[col], '^', color='green')
+    ax = fig.add_subplot(n_rows, n_cols, plt_idx)
+    ax.yaxis.set_major_locator(plt.MaxNLocator(8))
+    plt_idx += 1
+    sns.kdeplot(data=ind_view_h[col], fill=True, ax=ax, color='red')
+    sns.kdeplot(data=ind_view_l[col], fill=True, ax=ax, color='green')
+    ax.text(0.5, 0.5, col, fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
+#fig.autofmt_xdate()
+fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.2, hspace=0.6)
+mplcursors.cursor(fig)
+plt.show()
 ##stage_regression
 regression_conf = config["stage_regression"]
 ### correlation
