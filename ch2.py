@@ -8,13 +8,15 @@ import mplcursors
 import seaborn as sns
 from ch_indicators import *
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score, train_test_split
+from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score, train_test_split, GridSearchCV
 from sklearn.metrics import confusion_matrix
+from ch2_ml import *
+from ch2_validate import *
 #plt.style.use('seaborn-whitegrid')
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', help='path to ohlcv csv table', type=str, default="btcusd_1-min_data.csv")
-parser.add_argument('-c', '--config', help='path to config file', type=str, default="defconfig.json")
+parser.add_argument('-c', '--config', help='path to config file', type=str, default="testconfig.json")
 args = parser.parse_args()
 pd.set_option('display.max_columns', None)
 
@@ -76,6 +78,7 @@ if (len(gaps)):
 peaks_conf = config["stage_peaks_detect"]
 point_column = peaks_conf['point_column']
 diff_threshold = peaks_conf['diff_threshold']
+candles_sliced['peak_cl'] = 0
 peak_last = candles_sliced.iloc[0]
 peak_new = candles_sliced.iloc[1]
 diff_left_max = 0
@@ -88,22 +91,23 @@ for index, row in candles_sliced.iterrows():
     elif (abs(diff_left_max) >= diff_threshold) and (abs(diff_right) >= diff_threshold):
         #print(f'!peak found: {index} = {row[point_column]}({diff_right}). apply {diff_left_max} to {peak_last.name}')
         candles_sliced.loc[peak_last.name, 'diff'] = diff_left_max
+        candles_sliced.loc[peak_last.name, 'peak_cl'] = 1 if diff_left_max < 0 else -1
         peak_last = peak_new
         peak_new = row
         diff_left = diff_right
         diff_left_max = diff_left
         diff_right = 0
 
-
 candles_sliced.to_csv('candles_sliced1.csv', index=True) 
 candles_sliced.iloc[0,candles_sliced.columns.get_loc('diff')] = np.nan  #отсечение первого пика т.к. для него нет левого отклонения
 candles_sliced['peak_high'] = candles_sliced['diff'] < 0
 candles_sliced['peak_low'] = candles_sliced['diff'] > 0
+
 ### verify peaks
 h_peaks_cnt = len(candles_sliced[candles_sliced.peak_high == True])
 l_peaks_cnt = len(candles_sliced[candles_sliced.peak_low == True])
 if (abs(h_peaks_cnt - l_peaks_cnt) > 1):
-    print(f'FATAL ERROR: Peaks not balanced: {h_peaks_cnt}, {l_peaks_cnt}')
+    print(f'FATAL ERROR: Peaks not balanced: {h_peaks_cnt}, {l_peaks_cnt}. Check peaks detection')
     exit(1)
 ## calculate indicators
 indicators_conf = config["indicators"]
@@ -123,8 +127,9 @@ ind_view_l = peaks_view.drop(['peak_high', 'peak_low'], axis=1)[peaks_view.peak_
 fig = plt.figure(figsize=(25,13))
 x_loc_fmt = mpl.dates.DateFormatter('%d.%m.%y')
 n_rows = len(peaks_view.columns) + 1
-n_cols = 2
+n_cols = 3
 plt_idx = 1
+### prices
 ax = fig.add_subplot(n_rows, n_cols, plt_idx)
 ax.xaxis.set_major_locator(plt.MaxNLocator(10))
 ax.xaxis.set_major_formatter(x_loc_fmt)
@@ -132,6 +137,7 @@ ax.yaxis.set_major_locator(plt.MaxNLocator(8))
 plt_idx += 1
 ax.plot(diff_view.index, diff_view[point_column], color='red')
 ax.text(0.5, 0.5, 'Price', fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
+### peaks
 ax = fig.add_subplot(n_rows, n_cols, plt_idx)
 ax.xaxis.set_major_locator(plt.MaxNLocator(10))
 ax.xaxis.set_major_formatter(x_loc_fmt)
@@ -139,7 +145,11 @@ ax.yaxis.set_major_locator(plt.MaxNLocator(8))
 plt_idx += 1
 ax.plot(diff_view.index, diff_view['diff'], 'o', color='red')
 ax.text(0.5, 0.5, 'Difference', fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
+###stub
+ax = fig.add_subplot(n_rows, n_cols, plt_idx) 
+plt_idx += 1
 for col in ind_view_h.columns:
+    ### scatter plot
     ax = fig.add_subplot(n_rows, n_cols, plt_idx)
     ax.xaxis.set_major_locator(plt.MaxNLocator(10))
     ax.xaxis.set_major_formatter(x_loc_fmt)
@@ -148,16 +158,23 @@ for col in ind_view_h.columns:
     ax.text(0.5, 0.5, col, fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
     ax.plot(ind_view_h.index, ind_view_h[col], 'v', color='red')
     ax.plot(ind_view_l.index, ind_view_l[col], '^', color='green')
+    ### kde plot
     ax = fig.add_subplot(n_rows, n_cols, plt_idx)
     ax.yaxis.set_major_locator(plt.MaxNLocator(8))
     plt_idx += 1
     sns.kdeplot(data=ind_view_h[col], fill=True, ax=ax, color='red')
     sns.kdeplot(data=ind_view_l[col], fill=True, ax=ax, color='green')
     ax.text(0.5, 0.5, col, fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
+    ### diff correlation plot
+    ax = fig.add_subplot(n_rows, n_cols, plt_idx)
+    ax.yaxis.set_major_locator(plt.MaxNLocator(8))
+    plt_idx += 1
+    sns.jointplot(x=col, y="diff", data=diff_view, kind='reg', ax=ax)
+    ax.text(0.5, 0.5, col, fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
 #fig.autofmt_xdate()
 fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.2, hspace=0.6)
 mplcursors.cursor(fig)
-plt.show()
+#plt.show()
 ##stage_regression
 regression_conf = config["stage_regression"]
 ### correlation
@@ -214,19 +231,40 @@ test_to_predict = Y_test.to_frame()
 test_to_predict['prediction'] = prediction
 test_to_predict = test_to_predict[test_to_predict.prediction == True]
 print(test_to_predict)
-profit = 0
-td = pd.to_timedelta(candles_sliced['Timestamp'].iloc[0:2].diff(), unit='s').iloc[1]
-print(td)
-for pr_index, pr_row in test_to_predict.iterrows():
-    price_buy = candles_sliced.loc[pr_index,point_column]
-    for ohlc_index, ohlc_row in candles_sliced.loc[pr_index+td:].iterrows():
-        diff = (ohlc_row[point_column] - price_buy)/price_buy
-        if (abs(diff) > diff_threshold):
-            profit += -diff
-            break
-print(f'Estimated profit:{profit}')
 
-
-
+print(f'Estimated profit:{check_profit()}')
+### KDEClassifier
+kde_data = candles_sliced.loc[:,'peak_cl':].dropna()
+kde_x = kde_data.loc[:,'peak_low':]
+kde_x.drop(['peak_low'], axis=1, inplace=True)
+kde_y = kde_data['peak_cl']
+X_train, X_test, Y_train, Y_test = train_test_split(kde_x, kde_y, 
+                                                    test_size=1/learn_test_ratio, stratify=kde_y)
+#### adjust bandwidth
+grid = GridSearchCV(KDEClassifier(),
+    {'bandwidth': np.logspace(0, 2, 100)})
+grid.fit(X_train, Y_train)
+fig, ax = plt.subplots()
+ax.semilogx(np.array(grid.cv_results_['param_bandwidth']),
+            grid.cv_results_['mean_test_score'])
+ax.set(title='KDE Model Performance', ylim=(0, 1),
+        xlabel='bandwidth', ylabel='accuracy')
+#plt.show()
+print(f'best param: {grid.best_params_}')
+print(f'accuracy = {grid.best_score_}')
+#### validation
+model = KDEClassifier(bandwidth=grid.best_params_['bandwidth'])
+model.fit(X_train, Y_train)
+prediction = model.predict(X_test)
+matrix = confusion_matrix(y_true=Y_test, y_pred=prediction)
+print(f"""Y_test high peaks:{len(Y_test[Y_test == 1])} 
+        prediction high peaks:{len(prediction[prediction == 1])}
+        Y_test low peaks:{len(Y_test[Y_test == -1])} 
+        prediction low peaks:{len(prediction[prediction == -1])}""")
+print(matrix)
+test_to_predict = Y_test.to_frame()
+test_to_predict['prediction'] = prediction
+print(test_to_predict)
+print(f'failures: {test_to_predict[test_to_predict.peak_cl != test_to_predict.prediction]}')
     
         
