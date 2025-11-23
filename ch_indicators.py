@@ -20,7 +20,7 @@ def sma(ohlc: pd.DataFrame, conf, **kwargs):
         ohlc_sma = ohlc[column].rolling(window=window_n).mean()
         #print(ohlc_sma)
         ohlc[f'sma{window_n}'] = (ohlc[column] - ohlc_sma) / ohlc_sma
-    print(ohlc.dropna())
+    #print(ohlc.dropna())
     return ohlc
 
 def ema(ohlc, conf, **kwargs):
@@ -31,7 +31,7 @@ def ema(ohlc, conf, **kwargs):
     for w in n:
         ema = talib.EMA(ohlc[column], w)
         ohlc[f'ema{w}'] = (ohlc[column] - ema)/ema
-    print(ohlc.dropna())
+    #print(ohlc.dropna())
     return ohlc
 
 def stoch(ohlc, conf, **kwargs):
@@ -46,8 +46,8 @@ def stoch(ohlc, conf, **kwargs):
                 stoch = talib.STOCH(ohlc['High'], ohlc['Low'], ohlc['Close'], 
                                 fastk_period=w, slowk_period=k, slowd_period=d)
                 ohlc[f'stoch_k_{w}_{k}_{d}'] = stoch[0]/100
-                ohlc[f'stoch_d_{w}_{k}_{d}'] = stoch[1]/100
-    print(ohlc.dropna())
+                #ohlc[f'stoch_d_{w}_{k}_{d}'] = stoch[1]/100
+    #print(ohlc.dropna())
     return ohlc
 
 def rsi(ohlc, conf, **kwargs):
@@ -57,7 +57,7 @@ def rsi(ohlc, conf, **kwargs):
     for w in n:
         rsi = talib.RSI(ohlc['Close'], w)
         ohlc[f'rsi{w}'] = rsi/100
-    print(ohlc.dropna())
+    #print(ohlc.dropna())
     return ohlc
 
 

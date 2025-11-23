@@ -78,7 +78,8 @@ if (len(gaps)):
 peaks_conf = config["stage_peaks_detect"]
 point_column = peaks_conf['point_column']
 diff_threshold = peaks_conf['diff_threshold']
-candles_sliced['peak_cl'] = 0
+candles_sliced['diff'] = np.nan
+candles_sliced['peak_cl'] = "None"
 peak_last = candles_sliced.iloc[0]
 peak_new = candles_sliced.iloc[1]
 diff_left_max = 0
@@ -91,7 +92,7 @@ for index, row in candles_sliced.iterrows():
     elif (abs(diff_left_max) >= diff_threshold) and (abs(diff_right) >= diff_threshold):
         #print(f'!peak found: {index} = {row[point_column]}({diff_right}). apply {diff_left_max} to {peak_last.name}')
         candles_sliced.loc[peak_last.name, 'diff'] = diff_left_max
-        candles_sliced.loc[peak_last.name, 'peak_cl'] = 1 if diff_left_max < 0 else -1
+        candles_sliced.loc[peak_last.name, 'peak_cl'] = 'High' if diff_left_max < 0 else 'Low'
         peak_last = peak_new
         peak_new = row
         diff_left = diff_right
@@ -122,8 +123,14 @@ candles_sliced.to_csv('candles_sliced.csv', index=True)
 diff_view = candles_sliced.dropna()
 diff_view.to_csv('diff_view.csv', index=True) 
 peaks_view = diff_view.loc[:,"peak_high":]
-ind_view_h = peaks_view.drop(['peak_high', 'peak_low'], axis=1)[peaks_view.peak_high == True]
-ind_view_l = peaks_view.drop(['peak_high', 'peak_low'], axis=1)[peaks_view.peak_low == True]
+ind_view = candles_sliced.loc[:,'peak_high':]
+ind_view.dropna()
+ind_view_h = ind_view[ind_view.peak_high == True]
+ind_view_h.drop(['peak_low', 'peak_high'], axis=1, inplace=True)
+ind_view_l = ind_view[ind_view.peak_low == True]
+ind_view_l.drop(['peak_low', 'peak_high'], axis=1, inplace=True)
+ind_view_none = ind_view[(ind_view.peak_low == False) & (ind_view.peak_high == False)]
+ind_view_none.drop(['peak_low', 'peak_high'], axis=1, inplace=True)
 fig = plt.figure(figsize=(25,13))
 x_loc_fmt = mpl.dates.DateFormatter('%d.%m.%y')
 n_rows = len(peaks_view.columns) + 1
@@ -164,23 +171,24 @@ for col in ind_view_h.columns:
     plt_idx += 1
     sns.kdeplot(data=ind_view_h[col], fill=True, ax=ax, color='red')
     sns.kdeplot(data=ind_view_l[col], fill=True, ax=ax, color='green')
+    sns.kdeplot(data=ind_view_none[col], fill=True, ax=ax, color='gray')
     ax.text(0.5, 0.5, col, fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
     ### diff correlation plot
     ax = fig.add_subplot(n_rows, n_cols, plt_idx)
     ax.yaxis.set_major_locator(plt.MaxNLocator(8))
     plt_idx += 1
-    sns.jointplot(x=col, y="diff", data=diff_view, kind='reg', ax=ax)
+    sns.jointplot(x=col, y="diff", data=diff_view, kind='reg')
     ax.text(0.5, 0.5, col, fontsize=12, transform=ax.transAxes, ha='center', va='center', alpha=0.5)
 #fig.autofmt_xdate()
 fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.2, hspace=0.6)
 mplcursors.cursor(fig)
-#plt.show()
+plt.show()
 ##stage_regression
 regression_conf = config["stage_regression"]
 ### correlation
 corr_threshold = regression_conf["threshold"]
 df_diff_ind = candles_sliced.loc[:, 'diff':].dropna()
-df_diff_ind.drop(['peak_high','peak_low'], axis=1, inplace=True)
+df_diff_ind.drop(['peak_high','peak_low','peak_cl'], axis=1, inplace=True)
 #print(df_diff_ind)
 ind_to_drop = []
 for ind in df_diff_ind.columns[:0:-1]:
@@ -231,8 +239,9 @@ test_to_predict = Y_test.to_frame()
 test_to_predict['prediction'] = prediction
 test_to_predict = test_to_predict[test_to_predict.prediction == True]
 print(test_to_predict)
-
-print(f'Estimated profit:{check_profit()}')
+print(f"""Estimated profit:{check_profit(candles_sliced[point_column],
+                            test_to_predict['prediction'], 
+                            diff_threshold, -diff_threshold)}""")
 ### KDEClassifier
 kde_data = candles_sliced.loc[:,'peak_cl':].dropna()
 kde_x = kde_data.loc[:,'peak_low':]
@@ -256,15 +265,18 @@ print(f'accuracy = {grid.best_score_}')
 model = KDEClassifier(bandwidth=grid.best_params_['bandwidth'])
 model.fit(X_train, Y_train)
 prediction = model.predict(X_test)
+print(f'predict_proba: {model.predict_proba(X_test)}')
 matrix = confusion_matrix(y_true=Y_test, y_pred=prediction)
-print(f"""Y_test high peaks:{len(Y_test[Y_test == 1])} 
-        prediction high peaks:{len(prediction[prediction == 1])}
-        Y_test low peaks:{len(Y_test[Y_test == -1])} 
-        prediction low peaks:{len(prediction[prediction == -1])}""")
-print(matrix)
+print(f'confusion_matrix: {matrix}')
 test_to_predict = Y_test.to_frame()
 test_to_predict['prediction'] = prediction
-print(test_to_predict)
+s_prediction = test_to_predict['prediction']
+h_prediction = s_prediction[s_prediction == "High"]
+l_prediction = s_prediction[s_prediction == "Low"]
+print(f'h/l peaks predicted: {len(s_prediction[s_prediction != "None"])}')
 print(f'failures: {test_to_predict[test_to_predict.peak_cl != test_to_predict.prediction]}')
+print(f"""Estimated profit:{check_profit(candles_sliced[point_column],
+                            h_prediction, 
+                            diff_threshold, -diff_threshold)}""")
     
         

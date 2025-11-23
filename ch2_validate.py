@@ -1,13 +1,21 @@
 import pandas as pd
 
-def check_profit(prices, prediction, stop_loss, take_profit):
+def check_profit(prices: pd.Series, prediction: pd.Series,
+                stop_loss, take_profit):
     profit = 0
-    td = pd.to_timedelta(candles_sliced['Timestamp'].iloc[0:2].diff(), unit='s').iloc[1]
+    td = prices.index[1] - prices.index[0]
     print(td)
-    for pr_index, pr_row in test_to_predict.iterrows():
-        price_buy = candles_sliced.loc[pr_index,point_column]
-        for ohlc_index, ohlc_row in candles_sliced.loc[pr_index+td:].iterrows():
-            diff = (ohlc_row[point_column] - price_buy)/price_buy
-            if (abs(diff) > diff_threshold):
-                profit += -diff
+    order_dir = 1 if take_profit > stop_loss else -1
+    for pr_index, pr_row in prediction.items():
+        price_order = prices.loc[pr_index]
+        sl = price_order*stop_loss*order_dir
+        tp = price_order*take_profit*order_dir
+        for ohlc_index, ohlc_row in prices[pr_index+td:].items():
+            diff = (ohlc_row - price_order)*order_dir
+            if (diff >= tp):
+                profit += abs(take_profit)
                 break
+            elif (diff <= sl):
+                profit -= abs(stop_loss)
+                break
+    return profit
