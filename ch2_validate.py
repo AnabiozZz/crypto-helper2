@@ -4,7 +4,6 @@ def check_profit(prices: pd.Series, prediction: pd.Series,
                 stop_loss, take_profit):
     profit = 0
     td = prices.index[1] - prices.index[0]
-    print(td)
     order_dir = 1 if take_profit > stop_loss else -1
     for pr_index, pr_row in prediction.items():
         price_order = prices.loc[pr_index]
