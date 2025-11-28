@@ -125,7 +125,7 @@ X.drop(['peak_cl','peak_high','peak_low'], axis=1, inplace=True)
 rus = RandomUnderSampler(random_state=0)
 X_resampled, y_resampled = rus.fit_resample(X, y)
 idx_l = y_resampled.index.intersection(candles_sliced.index)
-ohlc_ind_balanced = candles_sliced.loc[idx_l]
+ohlc_ind_balanced = candles_sliced.loc[idx_l].sort_index()
 ## Show plots
 plt.style.use('seaborn-v0_8-whitegrid')
 candles_sliced.to_csv('candles_sliced.csv', index=True) 
@@ -193,7 +193,7 @@ for col in ind_view_h.columns:
 #fig.autofmt_xdate()
 fig.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.2, hspace=0.6)
 mplcursors.cursor(fig)
-plt.show()
+#plt.show()
 ##stage_regression
 regression_conf = config["stage_regression"]
 ### correlation
@@ -258,8 +258,8 @@ kde_data = ohlc_ind_balanced.loc[:,'peak_cl':].dropna()
 kde_x = kde_data.loc[:,'peak_low':]
 kde_x.drop(['peak_low'], axis=1, inplace=True)
 kde_y = kde_data['peak_cl']
-X_train, X_test, Y_train, Y_test = train_test_split(kde_x, kde_y, 
-                                                    test_size=1/learn_test_ratio, stratify=kde_y)
+X_train, X_test, Y_train, Y_test = train_test_split(kde_x, kde_y, shuffle=False, 
+                                                    test_size=1/learn_test_ratio)
 #### adjust bandwidth
 grid = GridSearchCV(KDEClassifier(),
     {'bandwidth': np.logspace(0, 2, 100)})
@@ -289,5 +289,12 @@ print(f'failures: {test_to_predict[test_to_predict.peak_cl != test_to_predict.pr
 profit = check_profit(candles_sliced[point_column], h_prediction, diff_threshold, -diff_threshold)\
         + check_profit(candles_sliced[point_column],l_prediction, -diff_threshold, diff_threshold)
 print(f"""Estimated profit:{profit}""")
+##### backtrader
+ohlcv = candles[X_test.index.min():X_test.index.max()].loc[:,['Open','Close','Low','High','Volume']]
+run_backtrader(config["backtrade_validation"], ohlcv, test_to_predict['prediction'])
+
+
+
+
     
         
